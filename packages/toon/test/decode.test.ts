@@ -1,7 +1,6 @@
-import type { DecodeOptions } from '../src/types'
-import type { TestCase } from './types'
 import { describe, expect, it } from 'vitest'
-import { decode, encode } from '../src/index'
+import { buildValueFromEventsAsync } from '../src/decode/event-builder'
+import { decode, decodeStream, encode } from '../src/index'
 import { loadFixtures } from './utils'
 
 const fixtureFiles = await loadFixtures('decode')
@@ -9,27 +8,21 @@ const fixtureFiles = await loadFixtures('decode')
 for (const fixtures of fixtureFiles) {
   describe(fixtures.description, () => {
     for (const test of fixtures.tests) {
-      it(test.name, () => {
-        const resolvedOptions = resolveDecodeOptions(test.options)
+      it(test.name, async () => {
+        const input = test.input as string
+        const decodeAsync = () => buildValueFromEventsAsync(decodeStream(input.split('\n'), test.options))
 
         if (test.shouldError) {
-          expect(() => decode(test.input as string, resolvedOptions))
-            .toThrow()
+          expect(() => decode(input, test.options)).toThrow()
+          await expect(decodeAsync()).rejects.toThrow()
         }
         else {
-          const result = decode(test.input as string, resolvedOptions)
-          expect(result).toEqual(test.expected)
+          expect(decode(input, test.options)).toEqual(test.expected)
+          await expect(decodeAsync()).resolves.toEqual(test.expected)
         }
       })
     }
   })
-}
-
-function resolveDecodeOptions(options?: TestCase['options']): DecodeOptions {
-  return {
-    indentSize: options?.indentSize ?? 2,
-    strict: options?.strict ?? true,
-  }
 }
 
 describe('quoted content opacity (round-trip)', () => {
